@@ -13,7 +13,7 @@ public:
 	virtual void DeleteChar( const char *AuthID, int CharNum );
 	virtual void SendCharSuccess( const char *AuthID, int CharNum, ushort OrigMsg );
 	virtual void Error_FileNotFound( msg_e MsgID, const char *AuthID, int CharNum );
-	virtual void ValidationFailed( bool disp = true ); //MIB JAN2010_15
+	virtual void ValidationFailed( bool disp = true, const char *pass = "" ); //MIB JAN2010_15 //Wishbone MAR2016 - Added char paremeter for password.
 	virtual void Disconnected( );
 	void Print( char *szFormat, ... );
 	void DbgPrint( int DebugLevel, char *szFormat, ... );
@@ -78,6 +78,9 @@ int VerifyMap( char * smap , long ssize )
 	else if ( !strcmp( smap, "BAD_MAP" ) )
 		return false;
 
+	if( !ssize || ssize == 0 ) //Wishbone MAR2016 - If the map size ends up being 0, then we know there's an issue and deny the map.
+		return false;
+
 	string fileloc = MSCentral.m_SaveDir;
 	fileloc += "\\";
 	fileloc += "mapsizes.txt";
@@ -109,6 +112,46 @@ int VerifyMap( char * smap , long ssize )
 	return FoundAMap ? -1 : -2;
 }
 
+//Wishbone MAR2016 - Function to verify map hash.
+int VerifyMapHash( char *smap, int shash )
+{
+	//Save FN a bit of work if the server already knows it has a good/bad map
+	if ( !strcmp( smap, "MAP_VERIFIED" ) )
+		return true;
+	else if ( !strcmp( smap, "BAD_MAP" ) )
+		return false;
+
+	string fileloc = MSCentral.m_SaveDir;
+	fileloc += "\\";
+	fileloc += "maphash.txt";
+
+	bool FoundAMap = false;
+
+	ifstream file( fileloc.c_str() );
+	if ( file.is_open() )
+	{
+		while ( !file.eof() )
+		{
+			char fmap[512];
+			int fhash;
+			file >> fmap >> fhash;
+			//-1 on FN lets the map go no matter what
+			//Don't return false on mismatched sizes, as there may be more than one
+			//size per map (allowing people to update). Returns false later.
+			if ( !stricmp( fmap, smap ) )
+			{
+				if ( fhash == shash || fhash == -1 )
+					return 1;
+
+				FoundAMap = true; //We found a map with the right name but wrong size
+								  //For error notification - Wrong Size vs Illegal Map
+			}
+		}
+	}
+
+	return FoundAMap ? -1 : -2;
+}
+
 void CTransaction_CENTRAL::HandleMsg( msg_t &Msg )
 {
 	switch( Msg.Msg )
@@ -126,21 +169,19 @@ void CTransaction_CENTRAL::HandleMsg( msg_t &Msg )
 		case MSG_PASSWORD_NEW:
 		{
 			password_t &MsgPass = (password_t &)Msg;
-
-			int map_ver = VerifyMap( MsgPass.mapName , MsgPass.mapSize );
+			//DbgPrint( 3, "Map Name: %s, Hash: %i", MsgPass.mapName, MsgPass.mapHash );
+			int map_ver = VerifyMapHash( MsgPass.mapName , MsgPass.mapHash ); //Wishbone MAR2016 - Changed to VerifyMapHash from VerifyMap
 			bool CMap = map_ver == 1;
 			bool CPass = MSCentral.m_Password == MsgPass.Password;
-			if ( CMap && CPass )
+			if ( CPass && CMap ) //Wishbone MAR2016 - We check for pass first then do map verify.
 			{
 				DbgPrint( 4, "Password and Map Validated" );
 				m_Validated = true;
-			}
-			else
-			{
+			}else{
 				if ( !CMap )
 				{
 					//Only send this until the server "knows" the map is bad
-					if ( strcmp( MsgPass.mapName , "BAD_MAP" ) )
+					if ( strcmp( MsgPass.mapName, "BAD_MAP" ) )
 					{
 						error_t e;
 						e.Msg = MSG_ERROR;
@@ -148,12 +189,12 @@ void CTransaction_CENTRAL::HandleMsg( msg_t &Msg )
 						e.Length = sizeof( e );
 						sprintf( e.error_msg, ( map_ver == -1 ? "Your map differs from %s's" : "This map is not approved by %s" ), MSCentral.m_NetWorkName.c_str() );
 						send( m_Socket, (const char *)&e, e.Length, 0 );
-						if ( map_ver == -1 ) DbgPrint( 0, "Wrong map size: %s %i", MsgPass.mapName, MsgPass.mapSize );
+						if ( map_ver == -1 ) DbgPrint( 0, "Wrong map hash: %s %i", MsgPass.mapName, MsgPass.mapHash );
 						else DbgPrint( 0, "Illegal Map: %s", MsgPass.mapName );
 					}
 				}
 
-				ValidationFailed(!CPass);
+				ValidationFailed(!CPass, MsgPass.Password);
 			}
 			//Old way
 			/*if( MSCentral.m_Password == MsgPass.Password )
@@ -227,6 +268,7 @@ void CTransaction_CENTRAL::HandleMsg( msg_t &Msg )
 				SentChar( MsgRetrChar.AuthID, CharNum );
 
 				delete Buffer;
+				DbgPrint( 2, "CHARACTER: sucessful" );
 			}
 			else
 			{
@@ -387,10 +429,11 @@ void CTransaction_CENTRAL::HandleMsg( msg_t &Msg )
 }
 
 //MIB JAN2010_15 (mods)
-void CTransaction_CENTRAL::ValidationFailed( bool disp )
+//Wishbone MAR2016 - Supply password so we can see what password was used.
+void CTransaction_CENTRAL::ValidationFailed( bool disp, const char *pass )
 {
-	if( !m_Disconnected && disp )
-		DbgPrint( 0, "Bad Password" );
+	if( !m_Disconnected && disp && pass != "" )
+		DbgPrint( 0, "Bad Password: %s", pass );
 	SendDisconnect( );
 }
 

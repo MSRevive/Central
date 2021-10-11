@@ -20,6 +20,9 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
+				GlobalOptimizations="FALSE"
+				OptimizeForProcessor="3"
+				OptimizeForWindowsApplication="TRUE"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
@@ -208,11 +211,7 @@
 				Detect64BitPortabilityProblems="FALSE"
 				DebugInformationFormat="0"/>
 			<Tool
-				Name="VCCustomBuildTool"
-				Description="Copying..."
-				CommandLine="copy &quot;$(TargetPath)&quot; &quot;E:/hldev/thothie_effs_around&quot;
-"
-				Outputs="E:/hldev/thothie_effs_around/$(TargetFileName)"/>
+				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="wsock32.lib"

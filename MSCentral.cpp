@@ -43,9 +43,7 @@ void CMSCentral::Init( int argc, _TCHAR* argv[] )
 
 
 	Print( "Master Sword Central Server v%.2f.", VERSION );
-	Print( "CTRL-C to Quit." );
-	Print( "" );
-
+	Print( "CTRL-C to Quit.\n" ); //Wishbone MAR2016 - Should use new line instead.
 
 	WSADATA wsaData;
 	WSAStartup( MAKEWORD( 2, 2 ), &wsaData );
@@ -111,9 +109,11 @@ void CMSCentral::LoadOptions( )
 	ifstream file( "options.txt" );
 	char Option[256], Value[256];
 
-	m_NetWorkName = "Unnamed Network";
-	m_Port = CENTRAL_DEFAULT_PORT;
-	m_MaxThreads = 10;
+	//Wishbone MAR2016 - Default values so you don't need a options.txt to test.
+	//Thothie (Undone) - Would rather prefer it be required, so should this executable leak, it's usage won't be immediately obvious
+	//m_NetWorkName = "Default Network";
+	//m_Password = "123:NOV2015a";
+	//m_SaveDir = "save";
 
 	if( file.is_open() )
 	{
@@ -162,6 +162,7 @@ void CMSCentral::LoadOptions( )
 		file.close( );
 	}
 }
+
 bool CMSCentral::ReadFileLine( ifstream &file, char *OptionName, char *OutValue )
 {
 	char Buffer[4096];

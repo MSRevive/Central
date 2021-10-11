@@ -20,6 +20,7 @@ struct password_t : msg_t
 {
 	char Password[128];
 	char mapName[128];
+	int mapHash; //Wishbone MAR2016 - For via map hash.
 	long mapSize;
 };
 
